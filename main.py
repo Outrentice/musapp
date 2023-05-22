@@ -1,7 +1,9 @@
 import os
 import sys
+import time
 from typing import Union
 
+from pygame import mixer
 from PIL import Image, ImageDraw
 from mutagen.mp3 import MP3
 
@@ -247,7 +249,6 @@ class UserProfileWindow(QtWidgets.QWidget):
 
             for playlist in playlists_data[1:]:
                 count_main = self.ui.horizontalLayout_playlist.count()
-
                 new_playlist = QtWidgets.QPushButton()
                 new_playlist.setMinimumSize(QtCore.QSize(150, 150))
                 new_playlist.setMaximumSize(QtCore.QSize(150, 150))
@@ -315,10 +316,121 @@ class PlaylistWindow(QtWidgets.QMainWindow):
 
         self.set_playlist_data()
 
-    def show_main_window(self):
-        [self.main_window.ui.verticalLayout_in_scroll.addWidget(widget) for widget in self.playlists]
-        self.main_window.show()
-        self.hide()
+    def set_playlist_data(self):
+        self.cursor.execute('SELECT playlist_name, track_name, duration, cover_photo, mp3, performer_name, playlist.id'
+                            ' FROM playlist LEFT JOIN track_list ON track_id=track_list.id'
+                            ' LEFT JOIN performers ON track_list.performers_id=performers.id'
+                            ' WHERE playlist_name = %s AND user_id = %s AND track_id IS NOT NULL',
+                            (self.playlist_name, self.user_id))
+        playlist_data = self.cursor.fetchall()
+
+        self.ui.playlist_name.setText(self.playlist_name)
+
+        if playlist_data:
+            self.cursor.execute('SELECT login FROM users WHERE id = %s', (self.user_id,))
+            add_user = self.cursor.fetchone()[0]
+
+            self.ui.playButton_down.clicked.connect(self.play_track)
+            self.ui.playButton_down.setObjectName(str(playlist_data[0][6]))
+
+            for i in range(len(playlist_data)):
+                if i < 5 and playlist_data[i]:
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(0).widget().setObjectName(str(playlist_data[i][6]))
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(0).widget().clicked.connect(self.play_track)
+
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setPixmap(QtGui.QPixmap(playlist_data[i][3]))
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setScaledContents(True)
+
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(2).itemAt(0).widget().setText(playlist_data[i][1])
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(2).itemAt(1).widget().setText(playlist_data[i][5])
+
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(3).widget().setText('add: ' + add_user)
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(4).widget().setText(playlist_data[i][2])
+                else:
+                    self.add_track_in_scroll(playlist_data[i][3], playlist_data[i][1], playlist_data[i][5],
+                                             add_user, playlist_data[i][2], str(playlist_data[i][6]))
+
+    def play_track(self):
+        play_button = QtWidgets.QApplication.instance().sender()
+        playlist_track_id = play_button.objectName()
+
+        pause_icon = QtGui.QIcon()
+        pause_icon.addPixmap(QtGui.QPixmap("icons/pause-icon.svg"))
+
+        play_icon = QtGui.QIcon()
+        play_icon.addPixmap(QtGui.QPixmap("icons/play-icon.svg"))
+
+        self.cursor.execute('SELECT track_name, duration, cover_photo, mp3, performer_name'
+                            ' FROM playlist LEFT JOIN track_list ON track_id=track_list.id'
+                            ' LEFT JOIN performers ON track_list.performers_id=performers.id'
+                            ' WHERE playlist.id = %s', (int(playlist_track_id), ))
+
+        track_info = self.cursor.fetchone()
+
+        if self.__dict__.get('playing_track_info'):
+            if self.__dict__.get('playing_track_info')['playlist_track_id'] != playlist_track_id: # сделай, чтобы playing_track_info передавалась по плейлистам
+                self.playing_track_info['play_button'].setIcon(play_icon)
+
+                self.playing_track_info = self.create_playing_track_dict(track_info, play_button)
+                self.set_data_down_menu()
+
+                self.playing_track_info['mixer'].init()
+                self.playing_track_info['mixer'].music.load(track_info[3])
+                self.playing_track_info['mixer'].music.play()
+
+                play_button.setIcon(pause_icon)
+                self.ui.playButton_down.setIcon(pause_icon)
+            else:
+                if self.playing_track_info['status'] == 'play':
+                    self.playing_track_info['mixer'].music.pause()
+                    self.playing_track_info['status'] = 'pause'
+
+                    play_button.setIcon(play_icon)
+                    self.ui.playButton_down.setIcon(play_icon)
+
+                elif self.playing_track_info['status'] == 'pause':
+                    self.playing_track_info['mixer'].music.unpause()
+                    self.playing_track_info['status'] = 'play'
+
+                    play_button.setIcon(pause_icon)
+                    self.ui.playButton_down.setIcon(pause_icon)
+        else:
+            self.playing_track_info = self.create_playing_track_dict(track_info, play_button)
+            self.set_data_down_menu()
+
+            self.playing_track_info['mixer'].init()
+            self.playing_track_info['mixer'].music.load(track_info[3])
+            self.playing_track_info['mixer'].music.play()
+
+            play_button.setIcon(pause_icon)
+            self.ui.playButton_down.setIcon(pause_icon)
+
+    def create_playing_track_dict(self, track_info: tuple, play_button: QtCore.QCoreApplication) -> dict:
+        return {
+            'play_button': play_button,
+            'playlist_track_id': play_button.objectName(),
+            'track_name': track_info[0],
+            'duration': self.get_seconds_duration(track_info[1]),
+            'cover': track_info[2],
+            'mp3_path': track_info[3],
+            'executor': track_info[4],
+            'mixer': mixer,
+            'status': 'play'
+        }
+
+    def set_data_down_menu(self):
+        self.ui.track_image_down.setPixmap(QtGui.QPixmap(self.playing_track_info['cover']))
+        self.ui.track_image_down.setScaledContents(True)
+
+        self.ui.TrackName_down.setText(self.playing_track_info['track_name'])
+        self.ui.ArtistName_down.setText(self.playing_track_info['executor'])
+
+        self.ui.playButton_down.setObjectName(self.playing_track_info['playlist_track_id'])
+
+    @staticmethod
+    def get_seconds_duration(duration: str) -> int:
+        duration = duration.split(':')
+        return int(duration[0]) * 60 + int(duration[1])
 
     def get_name_image(self):
         self.file_path_img, _ = QtWidgets.QFileDialog.getOpenFileName(self.dialog_window, "Open File", ".", "Image files (*.png, *.jpg)")
@@ -450,7 +562,7 @@ class PlaylistWindow(QtWidgets.QMainWindow):
                 self.connection.commit()
 
                 self.cursor.execute('SELECT lastval()')
-                track_id = self.cursor.fetchone()
+                track_id = self.cursor.fetchone()[0]
             else:
                 if track_id[1] == 'Tracks/Covers/defaulf.jpg' and cover_path != 'Tracks/Covers/defaulf.jpg':
                     self.cursor.execute('UPDATE track_list SET cover_photo = %s WHERE id = %s',
@@ -464,9 +576,12 @@ class PlaylistWindow(QtWidgets.QMainWindow):
                             self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setScaledContents(True)
 
                 track_id = track_id[0]
+
             self.cursor.execute('INSERT INTO playlist (playlist_name, user_id, track_id) VALUES (%s, %s, %s)',
                                 (self.playlist_name, self.user_id, track_id))
             self.connection.commit()
+            self.cursor.execute('SELECT lastval()')
+            playlist_track_id = self.cursor.fetchone()[0]
 
             self.dialog_window.close()
 
@@ -477,17 +592,23 @@ class PlaylistWindow(QtWidgets.QMainWindow):
             if count_track == 5:
                 for i in range(count_track):
                     if self.ui.verticalLayout_2.itemAt(i).itemAt(3).widget().text() == 'add: owner':
+                        self.ui.verticalLayout_2.itemAt(i).itemAt(0).widget().setObjectName(str(playlist_track_id))
+                        self.ui.verticalLayout_2.itemAt(i).itemAt(0).widget().clicked.connect(self.play_track)
+
                         self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setPixmap(QtGui.QPixmap(cover_path))
                         self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setScaledContents(True)
+
                         self.ui.verticalLayout_2.itemAt(i).itemAt(2).itemAt(0).widget().setText(track_name)
                         self.ui.verticalLayout_2.itemAt(i).itemAt(2).itemAt(1).widget().setText(executor)
+
                         self.ui.verticalLayout_2.itemAt(i).itemAt(3).widget().setText('add: ' + add_user)
                         self.ui.verticalLayout_2.itemAt(i).itemAt(4).widget().setText(duration)
                         break
                     elif i == 4 and self.ui.verticalLayout_2.itemAt(i).itemAt(3).widget().text() != 'add: owner':
-                        self.add_track_in_scroll(cover_path, track_name, executor, add_user, duration)
+                        self.add_track_in_scroll(cover_path, track_name, executor,
+                                                 add_user, duration, str(playlist_track_id))
             else:
-                self.add_track_in_scroll(cover_path, track_name, executor, add_user, duration)
+                self.add_track_in_scroll(cover_path, track_name, executor, add_user, duration, str(playlist_track_id))
 
     def add_track(self):
         self.dialog_window = QtWidgets.QDialog()
@@ -500,32 +621,8 @@ class PlaylistWindow(QtWidgets.QMainWindow):
 
         self.dialog_window.exec()
 
-    def set_playlist_data(self):
-        self.cursor.execute('SELECT playlist_name, track_name, duration, cover_photo, mp3, performer_name'
-                            ' FROM playlist LEFT JOIN track_list ON track_id=track_list.id'
-                            ' LEFT JOIN performers ON track_list.performers_id=performers.id'
-                            ' WHERE playlist_name = %s AND user_id = %s AND track_id IS NOT NULL',
-                            (self.playlist_name, self.user_id))
-        playlist_data = self.cursor.fetchall()
-
-        self.ui.playlist_name.setText(self.playlist_name)
-
-        if playlist_data:
-            self.cursor.execute('SELECT login FROM users WHERE id = %s', (self.user_id,))
-            add_user = self.cursor.fetchone()[0]
-
-            for i in range(len(playlist_data)):
-                if i < 5 and playlist_data[i]:
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setPixmap(QtGui.QPixmap(playlist_data[i][3]))
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setScaledContents(True)
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(2).itemAt(0).widget().setText(playlist_data[i][1])
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(2).itemAt(1).widget().setText(playlist_data[i][5])
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(3).widget().setText('add: ' + add_user)
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(4).widget().setText(playlist_data[i][2])
-                else:
-                    self.add_track_in_scroll(playlist_data[i][3], playlist_data[i][1],
-                                             playlist_data[i][5], add_user, playlist_data[i][2])
-    def add_track_in_scroll(self, path_to_cover: str, track_name: str, executor: str, add_user: str, duration: str ):
+    def add_track_in_scroll(self, cover_path: str, track_name: str, executor: str,
+                            add_user: str, duration: str, track_id: str):
         horizontalLayout_4 = QtWidgets.QHBoxLayout()
         horizontalLayout_4.setObjectName("horizontalLayout_4")
 
@@ -541,7 +638,9 @@ class PlaylistWindow(QtWidgets.QMainWindow):
         playButton_1.setIconSize(QtCore.QSize(12, 12))
         playButton_1.setCheckable(False)
         playButton_1.setFlat(False)
-        playButton_1.setObjectName("playButton_1")
+        playButton_1.setObjectName(track_id)
+        playButton_1.clicked.connect(self.play_track)
+
 
         horizontalLayout_4.addWidget(playButton_1)
 
@@ -549,7 +648,7 @@ class PlaylistWindow(QtWidgets.QMainWindow):
         track1_image.setMaximumSize(QtCore.QSize(0, 30))
         track1_image.setMaximumSize(QtCore.QSize(30, 30))
         track1_image.setStyleSheet("border: 1px solid black; border-radius: 8px;")
-        track1_image.setPixmap(QtGui.QPixmap(path_to_cover))
+        track1_image.setPixmap(QtGui.QPixmap(cover_path))
         track1_image.setScaledContents(True)
         track1_image.setObjectName("track1_image")
 
@@ -627,6 +726,11 @@ class PlaylistWindow(QtWidgets.QMainWindow):
         horizontalLayout_4.addWidget(delete_button1)
 
         self.ui.verticalLayout_2.addLayout(horizontalLayout_4)
+
+    def show_main_window(self):
+        [self.main_window.ui.verticalLayout_in_scroll.addWidget(widget) for widget in self.playlists]
+        self.main_window.show()
+        self.hide()
 
     @staticmethod
     def error_handler(text: str, obj: QtWidgets.QLineEdit):

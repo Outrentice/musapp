@@ -350,14 +350,14 @@ class UiPlaylistView(object):
         self.centralwidget = QtWidgets.QWidget(musapp)
         self.centralwidget.setObjectName("centralwidget")
         self.playlist_image = QtWidgets.QLabel(self.centralwidget)
-        self.playlist_image.setGeometry(QtCore.QRect(490, 40, 211, 141))
+        self.playlist_image.setGeometry(QtCore.QRect(560, 40, 71, 71))
         self.playlist_image.setObjectName("playlist_image")
         self.playlist_name = QtWidgets.QLabel(self.centralwidget)
-        self.playlist_name.setGeometry(QtCore.QRect(500, 200, 181, 21))
+        self.playlist_name.setGeometry(QtCore.QRect(500, 130, 181, 21))
         self.playlist_name.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.playlist_name.setObjectName("playlist_name")
         self.scrollArea = QtWidgets.QScrollArea(self.centralwidget)
-        self.scrollArea.setGeometry(QtCore.QRect(310, 300, 571, 271))
+        self.scrollArea.setGeometry(QtCore.QRect(310, 250, 571, 271))
         self.scrollArea.setStyleSheet("border: none;")
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setObjectName("scrollArea")
@@ -856,6 +856,136 @@ class UiPlaylistView(object):
         self.add_track_button.setIconSize(QtCore.QSize(24, 24))
         self.add_track_button.setObjectName("add_track_button")
         self.horizontalLayout.addWidget(self.add_track_button)
+
+        self.widget = QtWidgets.QWidget(self.centralwidget)
+        self.widget.setGeometry(QtCore.QRect(310, 520, 561, 71))
+        self.widget.setObjectName("widget")
+        self.playing_track_verticalLayout = QtWidgets.QVBoxLayout(self.widget)
+        self.playing_track_verticalLayout.setContentsMargins(0, 0, 0, 0)
+        self.playing_track_verticalLayout.setSpacing(0)
+        self.playing_track_verticalLayout.setObjectName("playing_track_verticalLayout")
+        self.track_time_slider_down = QtWidgets.QSlider(self.widget)
+        self.track_time_slider_down.setStyleSheet("QSlider::groove:horizontal {\n"
+                                                  "    border-radius:1%;       \n"
+                                                  "    height: 10px;              \n"
+                                                  "    margin: -1px 0;           \n"
+                                                  "}\n"
+                                                  "QSlider::handle:horizontal {\n"
+                                                  "    height: 6px;     \n"
+                                                  "    width: 6px;\n"
+                                                  "}\n"
+                                                  "QSlider::add-page:horizontal {\n"
+                                                  "    background: darkgray;\n"
+                                                  "}\n"
+                                                  "QSlider::sub-page:horizontal {\n"
+                                                  "    background: rgb(0, 120, 60);\n"
+                                                  "}")
+        self.track_time_slider_down.setPageStep(10)
+        self.track_time_slider_down.setOrientation(QtCore.Qt.Orientation.Horizontal)
+        self.track_time_slider_down.setObjectName("track_time_slider_down")
+        self.playing_track_verticalLayout.addWidget(self.track_time_slider_down)
+        self.horizontalLayout_7 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_7.setObjectName("horizontalLayout_7")
+        self.playButton_down = QtWidgets.QPushButton(self.widget)
+        self.playButton_down.setMinimumSize(QtCore.QSize(24, 24))
+        self.playButton_down.setMaximumSize(QtCore.QSize(24, 24))
+        self.playButton_down.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        self.playButton_down.setStyleSheet("border: 1.5px solid black; border-radius: 12%;")
+        self.playButton_down.setText("")
+        self.playButton_down.setIcon(icon)
+        self.playButton_down.setIconSize(QtCore.QSize(12, 12))
+        self.playButton_down.setCheckable(False)
+        self.playButton_down.setFlat(False)
+        self.playButton_down.setObjectName("playButton_down")
+        self.horizontalLayout_7.addWidget(self.playButton_down)
+        self.skip_button_down = QtWidgets.QPushButton(self.widget)
+        self.skip_button_down.setMinimumSize(QtCore.QSize(24, 24))
+        self.skip_button_down.setMaximumSize(QtCore.QSize(24, 24))
+        self.skip_button_down.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        self.skip_button_down.setStyleSheet("border:none;")
+        self.skip_button_down.setText("")
+        icon5 = QtGui.QIcon()
+        icon5.addPixmap(QtGui.QPixmap("icons/skip-forward-icon.svg"))
+        self.skip_button_down.setIcon(icon5)
+        self.skip_button_down.setIconSize(QtCore.QSize(24, 24))
+        self.skip_button_down.setCheckable(False)
+        self.skip_button_down.setFlat(False)
+        self.skip_button_down.setObjectName("skip_button_down")
+        self.horizontalLayout_7.addWidget(self.skip_button_down)
+        self.track_image_down = QtWidgets.QLabel(self.widget)
+        self.track_image_down.setMinimumSize(QtCore.QSize(40, 40))
+        self.track_image_down.setMaximumSize(QtCore.QSize(40, 40))
+        self.track_image_down.setStyleSheet(
+            "border: 1px solid black; border-radius: 8px;  background-image: url(\"C:/Users/stade/Downloads/sunset-4475686_1920.jpg\"); background-position: center;")
+        self.track_image_down.setText("")
+        self.track_image_down.setScaledContents(True)
+        self.track_image_down.setObjectName("track_image_down")
+        self.horizontalLayout_7.addWidget(self.track_image_down)
+        self.verticalLayout_trackname_down = QtWidgets.QVBoxLayout()
+        self.verticalLayout_trackname_down.setSpacing(0)
+        self.verticalLayout_trackname_down.setObjectName("verticalLayout_trackname_down")
+        self.TrackName_down = QtWidgets.QLabel(self.widget)
+        self.TrackName_down.setMinimumSize(QtCore.QSize(0, 0))
+        self.TrackName_down.setMaximumSize(QtCore.QSize(250, 15))
+        font = QtGui.QFont()
+        font.setFamily("MS Shell Dlg 2")
+        font.setPointSize(8)
+        font.setBold(True)
+        font.setWeight(75)
+        font.setKerning(True)
+        self.TrackName_down.setFont(font)
+        self.TrackName_down.setStyleSheet("color: rgb(255, 255, 255);")
+        self.TrackName_down.setObjectName("TrackName_down")
+        self.verticalLayout_trackname_down.addWidget(self.TrackName_down)
+        self.ArtistName_down = QtWidgets.QLabel(self.widget)
+        self.ArtistName_down.setMinimumSize(QtCore.QSize(0, 0))
+        self.ArtistName_down.setMaximumSize(QtCore.QSize(250, 15))
+        font = QtGui.QFont()
+        font.setFamily("MV Boli")
+        self.ArtistName_down.setFont(font)
+        self.ArtistName_down.setStyleSheet(" color: rgb(152, 152, 152);")
+        self.ArtistName_down.setObjectName("ArtistName_down")
+        self.verticalLayout_trackname_down.addWidget(self.ArtistName_down)
+        self.horizontalLayout_7.addLayout(self.verticalLayout_trackname_down)
+        self.volume_icon_down = QtWidgets.QPushButton(self.widget)
+        self.volume_icon_down.setMinimumSize(QtCore.QSize(31, 31))
+        self.volume_icon_down.setMaximumSize(QtCore.QSize(31, 31))
+        self.volume_icon_down.setStyleSheet("border: none;")
+        self.volume_icon_down.setText("")
+        icon6 = QtGui.QIcon()
+        icon6.addPixmap(QtGui.QPixmap("icons/high-volume-icon.svg"))
+        self.volume_icon_down.setIcon(icon6)
+        self.volume_icon_down.setIconSize(QtCore.QSize(24, 24))
+        self.volume_icon_down.setObjectName("volume_icon_down")
+        self.horizontalLayout_7.addWidget(self.volume_icon_down)
+        self.volume_slider_down = QtWidgets.QSlider(self.widget)
+        self.volume_slider_down.setMaximumSize(QtCore.QSize(100, 16777215))
+        self.volume_slider_down.setStyleSheet("QSlider::groove:horizontal {\n"
+                                              "    border-radius:1%;       \n"
+                                              "    height: 6px;              \n"
+                                              "    margin: -1px 0;           \n"
+                                              "}\n"
+                                              "QSlider::handle:horizontal {\n"
+                                              "    background-color: rgb(85, 17, 255);\n"
+                                              "    border: 0.5px solid  rgb(85, 17, 255);\n"
+                                              "    height: 12px;     \n"
+                                              "    width: 12px;\n"
+                                              "    margin: -4px 0;     \n"
+                                              "    border-radius: 7px  ;\n"
+                                              "    padding: -4px 0px;  \n"
+                                              "}\n"
+                                              "QSlider::add-page:horizontal {\n"
+                                              "    background: darkgray;\n"
+                                              "}\n"
+                                              "QSlider::sub-page:horizontal {\n"
+                                              "    background: rgb(0, 120, 60);\n"
+                                              "}")
+        self.volume_slider_down.setMaximum(100)
+        self.volume_slider_down.setProperty("value", 100)
+        self.volume_slider_down.setOrientation(QtCore.Qt.Orientation.Horizontal)
+        self.volume_slider_down.setObjectName("volume_slider_down")
+        self.horizontalLayout_7.addWidget(self.volume_slider_down)
+        self.playing_track_verticalLayout.addLayout(self.horizontalLayout_7)
         musapp.setCentralWidget(self.centralwidget)
 
         self.retranslateUi(musapp)
@@ -899,5 +1029,8 @@ class UiPlaylistView(object):
         self.toolBox_2.setItemText(self.toolBox_2.indexOf(self.page_3), _translate("musapp", "Artists"))
         self.playlist1_into_scroll.setText(_translate("musapp", "playlist 1"))
         self.toolBox_2.setItemText(self.toolBox_2.indexOf(self.page_4), _translate("musapp", "playlists"))
+
+        self.TrackName_down.setText(_translate("musapp", "TrackName"))
+        self.ArtistName_down.setText(_translate("musapp", "ArtistName"))
 
 
