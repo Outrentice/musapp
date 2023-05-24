@@ -342,6 +342,78 @@ class UiAddTrack(object):
         self.Executor.setText(_translate("Dialog", "Executor:"))
 
 
+class UiAddCoowner(object):
+    def setupUi(self, Dialog):
+        Dialog.setObjectName("Dialog")
+        Dialog.resize(374, 300)
+        Dialog.setMaximumSize(QtCore.QSize(16777215, 16777215))
+        self.add = QtWidgets.QPushButton(Dialog)
+        self.add.setGeometry(QtCore.QRect(160, 250, 75, 23))
+        self.add.setObjectName("add")
+        self.layoutWidget = QtWidgets.QWidget(Dialog)
+        self.layoutWidget.setGeometry(QtCore.QRect(130, 70, 131, 50))
+        self.layoutWidget.setObjectName("layoutWidget")
+        self.verticalLayout = QtWidgets.QVBoxLayout(self.layoutWidget)
+        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout.setSpacing(0)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.Track_name = QtWidgets.QLabel(self.layoutWidget)
+        self.Track_name.setObjectName("Track_name")
+        self.verticalLayout.addWidget(self.Track_name)
+        self.lineEdit = QtWidgets.QLineEdit(self.layoutWidget)
+        self.lineEdit.setObjectName("lineEdit")
+        self.lineEdit.setMinimumSize(0, 18)
+        self.verticalLayout.addWidget(self.lineEdit)
+        self.scrollArea = QtWidgets.QScrollArea(Dialog)
+        self.scrollArea.setGeometry(QtCore.QRect(120, 130, 161, 101))
+        self.scrollArea.setStyleSheet("")
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollArea.setObjectName("scrollArea")
+        self.scrollAreaWidgetContents = QtWidgets.QWidget()
+        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 159, 99))
+        self.scrollAreaWidgetContents.setObjectName("scrollAreaWidgetContents")
+        self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.scrollAreaWidgetContents)
+        self.verticalLayout_3.setObjectName("verticalLayout_3")
+        self.verticalLayout_2 = QtWidgets.QVBoxLayout()
+        self.verticalLayout_2.setObjectName("verticalLayout_2")
+        self.horizontalLayout = QtWidgets.QHBoxLayout()
+        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.coowner_1_name = QtWidgets.QLabel(self.scrollAreaWidgetContents)
+        self.coowner_1_name.setObjectName("coowner_1_name")
+        self.horizontalLayout.addWidget(self.coowner_1_name)
+        self.delete_coowner_button_1 = QtWidgets.QPushButton(self.scrollAreaWidgetContents)
+        self.delete_coowner_button_1.setMinimumSize(QtCore.QSize(24, 24))
+        self.delete_coowner_button_1.setMaximumSize(QtCore.QSize(24, 24))
+        self.delete_coowner_button_1.setStyleSheet("border:none;")
+        self.delete_coowner_button_1.setText("")
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icons/delete-svgrepo-com.svg"))
+        self.delete_coowner_button_1.setIcon(icon)
+        self.delete_coowner_button_1.setIconSize(QtCore.QSize(24, 24))
+        self.delete_coowner_button_1.setObjectName("delete_coowner_button_1")
+        self.horizontalLayout.addWidget(self.delete_coowner_button_1)
+        self.error_label = QtWidgets.QLabel(self.layoutWidget)
+        self.error_label.setText("")
+        self.error_label.setObjectName("label")
+        self.error_label.setStyleSheet("color: rgb(202, 0, 0);")
+        self.error_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        self.verticalLayout.addWidget(self.error_label)
+        self.verticalLayout_2.addLayout(self.horizontalLayout)
+        self.verticalLayout_3.addLayout(self.verticalLayout_2)
+        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
+
+        self.retranslateUi(Dialog)
+        QtCore.QMetaObject.connectSlotsByName(Dialog)
+
+    def retranslateUi(self, Dialog):
+        _translate = QtCore.QCoreApplication.translate
+        Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
+        self.add.setText(_translate("Dialog", "Add"))
+        self.Track_name.setText(_translate("Dialog", "Username:"))
+        self.coowner_1_name.setText(_translate("Dialog", "root_2"))
+
+
 class UiPlaylistView(object):
     def setupUi(self, musapp):
         musapp.setObjectName("musapp")
@@ -865,21 +937,7 @@ class UiPlaylistView(object):
         self.playing_track_verticalLayout.setSpacing(0)
         self.playing_track_verticalLayout.setObjectName("playing_track_verticalLayout")
         self.track_time_slider_down = QtWidgets.QSlider(self.widget)
-        self.track_time_slider_down.setStyleSheet("QSlider::groove:horizontal {\n"
-                                                  "    border-radius:1%;       \n"
-                                                  "    height: 10px;              \n"
-                                                  "    margin: -1px 0;           \n"
-                                                  "}\n"
-                                                  "QSlider::handle:horizontal {\n"
-                                                  "    height: 6px;     \n"
-                                                  "    width: 6px;\n"
-                                                  "}\n"
-                                                  "QSlider::add-page:horizontal {\n"
-                                                  "    background: darkgray;\n"
-                                                  "}\n"
-                                                  "QSlider::sub-page:horizontal {\n"
-                                                  "    background: rgb(0, 120, 60);\n"
-                                                  "}")
+        self.track_time_slider_down.setStyleSheet(track_time_slider_style)
         self.track_time_slider_down.setPageStep(10)
         self.track_time_slider_down.setOrientation(QtCore.Qt.Orientation.Horizontal)
         self.track_time_slider_down.setObjectName("track_time_slider_down")
@@ -960,26 +1018,7 @@ class UiPlaylistView(object):
         self.horizontalLayout_7.addWidget(self.volume_icon_down)
         self.volume_slider_down = QtWidgets.QSlider(self.widget)
         self.volume_slider_down.setMaximumSize(QtCore.QSize(100, 16777215))
-        self.volume_slider_down.setStyleSheet("QSlider::groove:horizontal {\n"
-                                              "    border-radius:1%;       \n"
-                                              "    height: 6px;              \n"
-                                              "    margin: -1px 0;           \n"
-                                              "}\n"
-                                              "QSlider::handle:horizontal {\n"
-                                              "    background-color: rgb(85, 17, 255);\n"
-                                              "    border: 0.5px solid  rgb(85, 17, 255);\n"
-                                              "    height: 12px;     \n"
-                                              "    width: 12px;\n"
-                                              "    margin: -4px 0;     \n"
-                                              "    border-radius: 7px  ;\n"
-                                              "    padding: -4px 0px;  \n"
-                                              "}\n"
-                                              "QSlider::add-page:horizontal {\n"
-                                              "    background: darkgray;\n"
-                                              "}\n"
-                                              "QSlider::sub-page:horizontal {\n"
-                                              "    background: rgb(0, 120, 60);\n"
-                                              "}")
+        self.volume_slider_down.setStyleSheet(volume_slider_style)
         self.volume_slider_down.setMaximum(100)
         self.volume_slider_down.setProperty("value", 100)
         self.volume_slider_down.setOrientation(QtCore.Qt.Orientation.Horizontal)

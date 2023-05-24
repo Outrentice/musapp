@@ -1,8 +1,9 @@
 import os
 import sys
-import time
-from typing import Union
 
+import threading
+
+from PyQt6.QtCore import QTimer
 from pygame import mixer
 from PIL import Image, ImageDraw
 from mutagen.mp3 import MP3
@@ -313,46 +314,102 @@ class PlaylistWindow(QtWidgets.QMainWindow):
 
         self.ui.back_button.clicked.connect(self.show_main_window)
         self.ui.add_track_button.clicked.connect(self.add_track)
+        self.ui.coowner_button.clicked.connect(self.add_coowner)
+        self.ui.track_time_slider_down.valueChanged.connect(self.change_time_playing_track)
+        self.ui.volume_slider_down.valueChanged.connect(self.change_volume_channel)
 
+        self.timer_fill = QTimer()
+        self.timer_fill.timeout.connect(self.progress_track_time)
+
+        self.set_playlist_info()
         self.set_playlist_data()
 
     def set_playlist_data(self):
-        self.cursor.execute('SELECT playlist_name, track_name, duration, cover_photo, mp3, performer_name, playlist.id'
-                            ' FROM playlist LEFT JOIN track_list ON track_id=track_list.id'
-                            ' LEFT JOIN performers ON track_list.performers_id=performers.id'
-                            ' WHERE playlist_name = %s AND user_id = %s AND track_id IS NOT NULL',
-                            (self.playlist_name, self.user_id))
-        playlist_data = self.cursor.fetchall()
+        # self.cursor.execute('SELECT playlist_name, track_name, duration, cover_photo, mp3, performer_name, playlist.id'
+        #                     ' FROM playlist LEFT JOIN track_list ON track_id=track_list.id'
+        #                     ' LEFT JOIN performers ON track_list.performers_id=performers.id'
+        #                     ' WHERE playlist_name = %s AND user_id = %s AND track_id IS NOT NULL',
+        #                     (self.playlist_name, self.user_id))
+        # playlist_data = self.cursor.fetchall()
+        playlist_data = list(self.playlist_info.values())
+        playlist_track_id = list(self.playlist_info.keys())
 
         self.ui.playlist_name.setText(self.playlist_name)
 
         if playlist_data:
             self.cursor.execute('SELECT login FROM users WHERE id = %s', (self.user_id,))
-            add_user = self.cursor.fetchone()[0]
 
             self.ui.playButton_down.clicked.connect(self.play_track)
-            self.ui.playButton_down.setObjectName(str(playlist_data[0][6]))
+            self.ui.playButton_down.setObjectName(playlist_track_id[0])
+
+            self.ui.skip_button_down.setObjectName('skip')
+            self.ui.skip_button_down.clicked.connect(self.play_track)
+
+            self.ui.track_image_down.setPixmap(QtGui.QPixmap(playlist_data[0]['cover']))
+            self.ui.track_image_down.setScaledContents(True)
+
+            self.ui.TrackName_down.setText(playlist_data[0]['track_name'])
+            self.ui.ArtistName_down.setText(playlist_data[0]['executor'])
+
+            self.ui.playButton_down.setObjectName(playlist_track_id[0])
 
             for i in range(len(playlist_data)):
                 if i < 5 and playlist_data[i]:
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(0).widget().setObjectName(str(playlist_data[i][6]))
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(0).widget().setObjectName(playlist_track_id[i])
                     self.ui.verticalLayout_2.itemAt(i).itemAt(0).widget().clicked.connect(self.play_track)
 
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setPixmap(QtGui.QPixmap(playlist_data[i][3]))
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setPixmap(QtGui.QPixmap(playlist_data[i]['cover']))
                     self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setScaledContents(True)
 
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(2).itemAt(0).widget().setText(playlist_data[i][1])
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(2).itemAt(1).widget().setText(playlist_data[i][5])
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(2).itemAt(0).widget().setText(playlist_data[i]['track_name'])
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(2).itemAt(1).widget().setText(playlist_data[i]['executor'])
 
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(3).widget().setText('add: ' + add_user)
-                    self.ui.verticalLayout_2.itemAt(i).itemAt(4).widget().setText(playlist_data[i][2])
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(3).widget().setText('add: ' + playlist_data[i]['added'])
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(4).widget().setText(playlist_data[i]['duration'])
                 else:
-                    self.add_track_in_scroll(playlist_data[i][3], playlist_data[i][1], playlist_data[i][5],
-                                             add_user, playlist_data[i][2], str(playlist_data[i][6]))
+                    self.add_track_in_scroll(playlist_data[i]['cover'], playlist_data[i]['track_name'],
+                                             playlist_data[i]['executor'], playlist_data[i]['added'],
+                                             playlist_data[i]['duration'], playlist_track_id[i])
 
-    def play_track(self):
+    def set_playlist_info(self):
+        self.cursor.execute('SELECT playlist.id, track_name, duration, cover_photo, mp3, performer_name, track_added'
+                            ' FROM playlist LEFT JOIN track_list ON track_id=track_list.id'
+                            ' LEFT JOIN performers ON track_list.performers_id=performers.id'
+                            ' WHERE playlist.playlist_name = %s AND playlist.user_id = %s AND track_id IS NOT NULL',
+                            (self.playlist_name, self.user_id))
+        info = self.cursor.fetchall()
+
+        self.playlist_info = {}
+        for track_in_playlist in info:
+            self.playlist_info[str(track_in_playlist[0])] = {
+                'track_name': track_in_playlist[1],
+                'duration': track_in_playlist[2],
+                'cover': track_in_playlist[3],
+                'mp3': track_in_playlist[4],
+                'executor': track_in_playlist[5],
+                'added': track_in_playlist[6]
+            }
+
+    def play_track(self, is_skip: bool=False):
         play_button = QtWidgets.QApplication.instance().sender()
         playlist_track_id = play_button.objectName()
+
+        if (self.__dict__.get('playing_track_info') and playlist_track_id == 'skip') or is_skip:
+            for i in range(self.ui.verticalLayout_2.count()):
+                if self.ui.verticalLayout_2.itemAt(i).itemAt(0).widget().objectName() == self.playing_track_info['playlist_track_id']:
+                    if(
+                        self.ui.verticalLayout_2.count() - 1 != i and
+                        'playButton' not in self.ui.verticalLayout_2.itemAt(i + 1).itemAt(0).widget().objectName()
+                    ):
+                        play_button = self.ui.verticalLayout_2.itemAt(i + 1).itemAt(0).widget()
+                        playlist_track_id = play_button.objectName()
+                    else:
+                        play_button = self.ui.verticalLayout_2.itemAt(0).itemAt(0).widget()
+                        playlist_track_id = play_button.objectName()
+                    break
+        elif not self.__dict__.get('playing_track_info') and playlist_track_id == 'skip':
+            play_button = self.ui.verticalLayout_2.itemAt(1).itemAt(0).widget()
+            playlist_track_id = play_button.objectName()
 
         pause_icon = QtGui.QIcon()
         pause_icon.addPixmap(QtGui.QPixmap("icons/pause-icon.svg"))
@@ -360,22 +417,19 @@ class PlaylistWindow(QtWidgets.QMainWindow):
         play_icon = QtGui.QIcon()
         play_icon.addPixmap(QtGui.QPixmap("icons/play-icon.svg"))
 
-        self.cursor.execute('SELECT track_name, duration, cover_photo, mp3, performer_name'
-                            ' FROM playlist LEFT JOIN track_list ON track_id=track_list.id'
-                            ' LEFT JOIN performers ON track_list.performers_id=performers.id'
-                            ' WHERE playlist.id = %s', (int(playlist_track_id), ))
-
-        track_info = self.cursor.fetchone()
+        track_info = self.playlist_info[playlist_track_id]
 
         if self.__dict__.get('playing_track_info'):
-            if self.__dict__.get('playing_track_info')['playlist_track_id'] != playlist_track_id: # сделай, чтобы playing_track_info передавалась по плейлистам
+            if self.playing_track_info['playlist_track_id'] != playlist_track_id: # сделай, чтобы playing_track_info передавалась по плейлистам
                 self.playing_track_info['play_button'].setIcon(play_icon)
 
                 self.playing_track_info = self.create_playing_track_dict(track_info, play_button)
                 self.set_data_down_menu()
 
-                self.playing_track_info['mixer'].init()
-                self.playing_track_info['mixer'].music.load(track_info[3])
+                self.set_value_track_time_slider(0)
+
+                self.timer_fill.start(self.playing_track_info['duration'] * 10)
+
                 self.playing_track_info['mixer'].music.play()
 
                 play_button.setIcon(pause_icon)
@@ -385,6 +439,8 @@ class PlaylistWindow(QtWidgets.QMainWindow):
                     self.playing_track_info['mixer'].music.pause()
                     self.playing_track_info['status'] = 'pause'
 
+                    self.timer_fill.stop()
+
                     play_button.setIcon(play_icon)
                     self.ui.playButton_down.setIcon(play_icon)
 
@@ -392,31 +448,38 @@ class PlaylistWindow(QtWidgets.QMainWindow):
                     self.playing_track_info['mixer'].music.unpause()
                     self.playing_track_info['status'] = 'play'
 
+                    self.timer_fill.start()
+
                     play_button.setIcon(pause_icon)
                     self.ui.playButton_down.setIcon(pause_icon)
         else:
             self.playing_track_info = self.create_playing_track_dict(track_info, play_button)
             self.set_data_down_menu()
 
-            self.playing_track_info['mixer'].init()
-            self.playing_track_info['mixer'].music.load(track_info[3])
+            self.timer_fill.start(self.playing_track_info['duration'] * 10)
+
             self.playing_track_info['mixer'].music.play()
 
             play_button.setIcon(pause_icon)
             self.ui.playButton_down.setIcon(pause_icon)
 
-    def create_playing_track_dict(self, track_info: tuple, play_button: QtCore.QCoreApplication) -> dict:
-        return {
+    def create_playing_track_dict(self, track_info: dict, play_button: QtCore.QCoreApplication) -> dict:
+        dictionary = {
             'play_button': play_button,
             'playlist_track_id': play_button.objectName(),
-            'track_name': track_info[0],
-            'duration': self.get_seconds_duration(track_info[1]),
-            'cover': track_info[2],
-            'mp3_path': track_info[3],
-            'executor': track_info[4],
+            'track_name': track_info['track_name'],
+            'duration': self.get_seconds_duration(track_info['duration']),
+            'cover': track_info['cover'],
+            'mp3_path': track_info['mp3'],
+            'executor': track_info['executor'],
             'mixer': mixer,
             'status': 'play'
         }
+
+        dictionary['mixer'].init()
+        dictionary['mixer'].music.load(track_info['mp3'])
+
+        return dictionary
 
     def set_data_down_menu(self):
         self.ui.track_image_down.setPixmap(QtGui.QPixmap(self.playing_track_info['cover']))
@@ -427,10 +490,46 @@ class PlaylistWindow(QtWidgets.QMainWindow):
 
         self.ui.playButton_down.setObjectName(self.playing_track_info['playlist_track_id'])
 
+    def set_value_track_time_slider(self, value):
+        self.ui.track_time_slider_down.valueChanged.disconnect()
+        self.ui.track_time_slider_down.setValue(value)
+        self.ui.track_time_slider_down.valueChanged.connect(self.change_time_playing_track)
+
     @staticmethod
     def get_seconds_duration(duration: str) -> int:
         duration = duration.split(':')
         return int(duration[0]) * 60 + int(duration[1])
+
+    def change_time_playing_track(self):
+        if self.__dict__.get('playing_track_info'):
+            position = (self.playing_track_info['duration'] / 100) * self.ui.track_time_slider_down.value()
+            self.playing_track_info['mixer'].music.set_pos(position)
+        else:
+            self.ui.track_time_slider_down.setValue(0)
+
+    def progress_track_time(self):
+        val = self.ui.track_time_slider_down.value() + 1
+
+        if val == 100:
+            self.play_track(True)
+        else:
+            self.set_value_track_time_slider(val)
+
+    def change_volume_channel(self):
+        if self.ui.volume_slider_down.value() >= 50:
+            icon = QtGui.QIcon()
+            icon.addPixmap(QtGui.QPixmap("icons/high-volume-icon.svg"))
+            self.ui.volume_icon_down.setIcon(icon)
+        elif self.ui.volume_slider_down.value() <= 50 and self.ui.volume_slider_down.value() > 0:
+            icon = QtGui.QIcon()
+            icon.addPixmap(QtGui.QPixmap("icons/low-volume-icon.svg"))
+            self.ui.volume_icon_down.setIcon(icon)
+        elif self.ui.volume_slider_down.value() == 0:
+            icon = QtGui.QIcon()
+            icon.addPixmap(QtGui.QPixmap("icons/no sound-icon.svg"))
+            self.ui.volume_icon_down.setIcon(icon)
+
+        self.playing_track_info['mixer'].music.set_volume(self.ui.volume_slider_down.value() / 100)
 
     def get_name_image(self):
         self.file_path_img, _ = QtWidgets.QFileDialog.getOpenFileName(self.dialog_window, "Open File", ".", "Image files (*.png, *.jpg)")
@@ -577,16 +676,36 @@ class PlaylistWindow(QtWidgets.QMainWindow):
 
                 track_id = track_id[0]
 
-            self.cursor.execute('INSERT INTO playlist (playlist_name, user_id, track_id) VALUES (%s, %s, %s)',
-                                (self.playlist_name, self.user_id, track_id))
-            self.connection.commit()
+            self.cursor.execute('SELECT login FROM users WHERE id = %s', (self.user_id,))
+            add_user = self.cursor.fetchone()[0]
+
+            self.cursor.execute('SELECT user_id, role FROM playlist'
+                                ' WHERE playlist_name = %s AND track_id IS NULL',
+                                (self.playlist_name, ))
+            coowners = self.cursor.fetchall()
+
+            if coowners:
+                for i in range(len(coowners)):
+                    self.cursor.execute('INSERT INTO playlist (playlist_name, user_id, track_id, track_added, role)'
+                                        ' VALUES (%s, %s, %s, %s, %s)',
+                                        (self.playlist_name, coowners[i][0], track_id, add_user, coowners[i][1]))
+                self.connection.commit()
+
             self.cursor.execute('SELECT lastval()')
             playlist_track_id = self.cursor.fetchone()[0]
 
+            self.playlist_info[str(playlist_track_id)] = {
+                'track_name': track_name,
+                'duration': duration,
+                'cover': cover_path,
+                'mp3': mp3_path,
+                'executor': executor,
+                'added': add_user
+            }
+
             self.dialog_window.close()
 
-            self.cursor.execute('SELECT login FROM users WHERE id = %s', (self.user_id,))
-            add_user = self.cursor.fetchone()[0]
+
 
             count_track = self.ui.verticalLayout_2.count()
             if count_track == 5:
@@ -620,6 +739,84 @@ class PlaylistWindow(QtWidgets.QMainWindow):
         self.dialog_add_track.add.clicked.connect(self.click_add_track_button)
 
         self.dialog_window.exec()
+
+    def add_coowner(self):
+        self.dialog_window = QtWidgets.QDialog()
+        self.dialog_add_coowner = UiAddCoowner()
+        self.dialog_add_coowner.setupUi(self.dialog_window)
+
+        self.set_coowner_dialog_window_data()
+        self.dialog_add_coowner.add.clicked.connect(self.click_add_coowner_button)
+
+        self.dialog_window.exec()
+
+    def set_coowner_dialog_window_data(self):
+        self.cursor.execute('SELECT login FROM playlist LEFT JOIN users ON user_id = users.id'
+                            ' WHERE playlist_name = %s AND role = %s AND track_id IS NULL',
+                            (self.playlist_name, 'coowner'))
+        coowners = self.cursor.fetchall()
+
+        if coowners:
+            self.dialog_add_coowner.verticalLayout_2.itemAt(0).itemAt(0).widget().setText(coowners[0][0])
+
+            for i in range(1, len(coowners)):
+                horizontalLayout = QtWidgets.QHBoxLayout()
+                horizontalLayout.setObjectName("horizontalLayout")
+                coowner_1_name = QtWidgets.QLabel(self.ui.scrollAreaWidgetContents)
+                coowner_1_name.setObjectName("coowner_1_name")
+                coowner_1_name.setText(coowners[i][0])
+                horizontalLayout.addWidget(coowner_1_name)
+                delete_coowner_button_1 = QtWidgets.QPushButton(self.ui.scrollAreaWidgetContents)
+                delete_coowner_button_1.setMinimumSize(QtCore.QSize(24, 24))
+                delete_coowner_button_1.setMaximumSize(QtCore.QSize(24, 24))
+                delete_coowner_button_1.setStyleSheet("border:none;")
+                delete_coowner_button_1.setText("")
+                icon = QtGui.QIcon()
+                icon.addPixmap(QtGui.QPixmap("icons/delete-svgrepo-com.svg"))
+                delete_coowner_button_1.setIcon(icon)
+                delete_coowner_button_1.setIconSize(QtCore.QSize(24, 24))
+                delete_coowner_button_1.setObjectName("delete_coowner_button_1")
+                horizontalLayout.addWidget(delete_coowner_button_1)
+
+                self.dialog_add_coowner.verticalLayout_2.addLayout(horizontalLayout)
+
+        else:
+            self.dialog_add_coowner.scrollArea.setParent(None)
+
+    def click_add_coowner_button(self):
+        self.cursor.execute('SELECT id, login FROM users WHERE login = %s',
+                            (self.dialog_add_coowner.lineEdit.text().strip(), ))
+        coowner = self.cursor.fetchone()
+
+        if coowner:
+            self.cursor.execute('SELECT id FROM playlist WHERE playlist_name = %s AND user_id = %s',
+                                (self.playlist_name, coowner[0]))
+            playlist_coowner = self.cursor.fetchone()
+
+            if playlist_coowner:
+                self.dialog_add_coowner.lineEdit.setStyleSheet(error_line_edit_register_style)
+                self.dialog_add_coowner.error_label.setText('Уже добавлен')
+            else:
+                self.cursor.execute('INSERT INTO playlist (playlist_name, user_id, role)'
+                                    ' VALUES (%s, %s, %s)',
+                                    (self.playlist_name, coowner[0], 'coowner'))
+                self.connection.commit()
+
+                self.cursor.execute('SELECT track_id, track_added FROM playlist'
+                                    ' WHERE playlist_name = %s AND user_id = %s AND track_id IS NOT NULL',
+                                    (self.playlist_name, self.user_id))
+                tracks = self.cursor.fetchall()
+
+                for i in range(len(tracks)):
+                    self.cursor.execute('INSERT INTO playlist (playlist_name, user_id, role, track_id, track_added)'
+                                        ' VALUES (%s, %s, %s, %s, %s)', (self.playlist_name, coowner[0], 'coowner',
+                                                                         tracks[i][0], tracks[i][1]))
+                self.connection.commit()
+                self.dialog_window.close()
+
+        else:
+            self.dialog_add_coowner.lineEdit.setStyleSheet(error_line_edit_register_style)
+            self.dialog_add_coowner.error_label.setText('Неверное имя')
 
     def add_track_in_scroll(self, cover_path: str, track_name: str, executor: str,
                             add_user: str, duration: str, track_id: str):
