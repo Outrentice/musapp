@@ -1,19 +1,18 @@
 import os
 import sys
 
-import threading
-
 from PyQt6.QtCore import QTimer
 from pygame import mixer
 from PIL import Image, ImageDraw
 from mutagen.mp3 import MP3
 
+from config import PASSWORD_DB
 from des_Login_Form import *
 from style_login_form import *
 from psycopg2 import connect
 import hashlib
 import string
-#Добавить кнопку посмотреть у поля ввода пароля(Вместо точек показывает пароль)
+
 
 class LoginWindow(QtWidgets.QWidget):
     def __init__(self, parent=None):
@@ -28,7 +27,7 @@ class LoginWindow(QtWidgets.QWidget):
 
         self.connection = connect(
             user="postgres",
-            password="445467qwe",
+            password=PASSWORD_DB,
             host="127.0.0.1",
             port="5432",
             database="MusicApp"
@@ -315,6 +314,7 @@ class PlaylistWindow(QtWidgets.QMainWindow):
         self.ui.back_button.clicked.connect(self.show_main_window)
         self.ui.add_track_button.clicked.connect(self.add_track)
         self.ui.coowner_button.clicked.connect(self.add_coowner)
+        self.ui.playlist_delete_button.clicked.connect(self.delete_playlist)
         self.ui.track_time_slider_down.valueChanged.connect(self.change_time_playing_track)
         self.ui.volume_slider_down.valueChanged.connect(self.change_volume_channel)
 
@@ -351,12 +351,13 @@ class PlaylistWindow(QtWidgets.QMainWindow):
             self.ui.TrackName_down.setText(playlist_data[0]['track_name'])
             self.ui.ArtistName_down.setText(playlist_data[0]['executor'])
 
-            self.ui.playButton_down.setObjectName(playlist_track_id[0])
-
             for i in range(len(playlist_data)):
                 if i < 5 and playlist_data[i]:
                     self.ui.verticalLayout_2.itemAt(i).itemAt(0).widget().setObjectName(playlist_track_id[i])
                     self.ui.verticalLayout_2.itemAt(i).itemAt(0).widget().clicked.connect(self.play_track)
+
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(5).widget().setObjectName(playlist_track_id[i])
+                    self.ui.verticalLayout_2.itemAt(i).itemAt(5).widget().clicked.connect(self.delete_track)
 
                     self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setPixmap(QtGui.QPixmap(playlist_data[i]['cover']))
                     self.ui.verticalLayout_2.itemAt(i).itemAt(1).widget().setScaledContents(True)
@@ -530,6 +531,55 @@ class PlaylistWindow(QtWidgets.QMainWindow):
             self.ui.volume_icon_down.setIcon(icon)
 
         self.playing_track_info['mixer'].music.set_volume(self.ui.volume_slider_down.value() / 100)
+
+    def delete_playlist(self):
+        self.cursor.execute('SELECT role FROM playlist WHERE playlist_name = %s AND user_id = %s AND track_id IS NULL',
+                            (self.playlist_name, self.user_id))
+        user_role = self.cursor.fetchone()
+
+        if user_role and user_role[0] == 'owner':
+            self.cursor.execute('DELETE FROM playlist WHERE playlist_name = %s', (self.playlist_name, ))
+        elif user_role and user_role[0] == 'coowner':
+            self.cursor.execute('DELETE FROM playlist WHERE playlist_name = %s AND user_id = %s',
+                                (self.playlist_name, self.user_id))
+        self.connection.commit()
+
+        for i in range(len(self.playlists)):
+            if self.playlists[i].text() == self.playlist_name:
+                self.playlists.pop(i)
+                break
+        for i in range(self.main_window.ui.horizontalLayout_playlist.count()):
+            if self.playlist_name == self.main_window.ui.horizontalLayout_playlist.itemAt(i).widget().text():
+                self.main_window.ui.horizontalLayout_playlist.itemAt(i).widget().deleteLater()
+                break
+
+        self.show_main_window()
+
+    # def delete_track(self):
+    #     playlist_track_id = QtWidgets.QApplication.instance().sender().objectName()
+    #     print(playlist_track_id)
+    #
+    #     self.cursor.execute('SELECT login FROM users WHERE id = %s', (self.user_id, ))
+    #     username = self.cursor.fetchone()
+    #     print(username)
+    #
+    #     self.cursor.execute('SELECT track_added, role FROM playlist'
+    #                         ' WHERE playlist_name = %s AND user_id = %s AND id = %s',
+    #                         (self.playlist_name, self.user_id, playlist_track_id))
+    #     track_added = self.cursor.fetchone()
+    #     print(track_added)
+    #
+    #     if track_added and (track_added[0] == username or track_added[1] == 'owner'):
+    #         self.cursor.execute('SELECT track_id FROM playlist WHERE id = %s', (playlist_track_id, ))
+    #
+    #         self.cursor.execute('DELETE FROM playlist WHERE playlist_name = %s AND track_id = %s',
+    #                             (self.playlist_name, playlist_track_id))
+    #         self.connection.commit()
+    #
+    #         for i in range(self.ui.verticalLayout_2.count()):
+    #             if self.ui.verticalLayout_2.itemAt(i).itemAt(5).widget().text() == playlist_track_id:
+    #                 self.ui.verticalLayout_2.itemAt(i).layout().setParent(None)
+    #                 break
 
     def get_name_image(self):
         self.file_path_img, _ = QtWidgets.QFileDialog.getOpenFileName(self.dialog_window, "Open File", ".", "Image files (*.png, *.jpg)")
@@ -705,8 +755,6 @@ class PlaylistWindow(QtWidgets.QMainWindow):
 
             self.dialog_window.close()
 
-
-
             count_track = self.ui.verticalLayout_2.count()
             if count_track == 5:
                 for i in range(count_track):
@@ -752,8 +800,8 @@ class PlaylistWindow(QtWidgets.QMainWindow):
 
     def set_coowner_dialog_window_data(self):
         self.cursor.execute('SELECT login FROM playlist LEFT JOIN users ON user_id = users.id'
-                            ' WHERE playlist_name = %s AND role = %s AND track_id IS NULL',
-                            (self.playlist_name, 'coowner'))
+                            ' WHERE playlist_name = %s AND user_id != %s AND track_id IS NULL',
+                            (self.playlist_name, self.user_id))
         coowners = self.cursor.fetchall()
 
         if coowners:
@@ -918,7 +966,8 @@ class PlaylistWindow(QtWidgets.QMainWindow):
         icon1.addPixmap(QtGui.QPixmap("icons/delete-svgrepo-com.svg"))
         delete_button1.setIcon(icon1)
         delete_button1.setIconSize(QtCore.QSize(24, 24))
-        delete_button1.setObjectName("delete_button1")
+        delete_button1.setObjectName(track_id)
+        delete_button1.clicked.connect(self.delete_track)
 
         horizontalLayout_4.addWidget(delete_button1)
 
